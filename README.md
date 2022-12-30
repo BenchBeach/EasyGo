@@ -1,8 +1,6 @@
-本文的石墨文档链接 [https://shimo.im/docs/CNQYjCjRt3QF89hz](https://shimo.im/docs/CNQYjCjRt3QF89hz)
-github地址 [https://github.com/JunguangJiang/TinyCCompiler/tree/master](https://github.com/JunguangJiang/TinyCCompiler/tree/master)
 # 开发环境
-python 3.6
-ANTLR 可通过pip install antlr4-python3-runtime安装
+python 3.6  
+ANTLR4 可通过pip install antlr4-python3-runtime安装ANTLR4  
 LLVM 可通过pip install llvmlite安装
 # 代码结构
 * parser
