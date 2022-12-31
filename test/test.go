@@ -1,3 +1,5 @@
 package packgername
 
-var a string = "Runoob"
+func main(){
+    var a,b int = 16
+}
