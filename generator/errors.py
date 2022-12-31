@@ -17,7 +17,7 @@ class SemanticError(Exception):
         return "SemanticError: " + str(self.line) + ":" + str(self.column) + " " + self.msg
 
 
-class TinyCErrorListener(ErrorListener):
+class EasyGoErrorListener(ErrorListener):
     """错误监听器"""
     def __init__(self):
         super().__init__()
