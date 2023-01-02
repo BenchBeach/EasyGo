@@ -146,6 +146,8 @@ class EasyGoGenerator(GoParserVisitor):
                     return self.builder.mul(lhs, rhs), _
                 elif op == '/':
                     return self.builder.sdiv(lhs, rhs), _
+                elif op in ['==', '!=', '>', '<', '>=', '<=']:
+                    return self.builder.icmp_signed(cmpop=op, lhs=lhs, rhs=rhs), None
                 else:
                     raise NotImplementedError("complex expression 2")
                 pass
@@ -158,6 +160,8 @@ class EasyGoGenerator(GoParserVisitor):
                     return self.builder.fmul(lhs, rhs), _
                 elif op == '/':
                     return self.builder.fdiv(lhs, rhs), _
+                elif op in ['==', '!=', '>', '<', '>=', '<=']:
+                    return self.builder.fcmp_ordered(cmpop=op, lhs=lhs, rhs=rhs), None
                 else:
                     raise NotImplementedError("complex expression 3")
                 pass
@@ -215,6 +219,22 @@ class EasyGoGenerator(GoParserVisitor):
             return self.visit(ctx.basicLit())
         else:
             raise NotImplementedError("more options of literal")
+
+    def visitIfStmt(self, ctx: GoParser.IfStmtContext):
+        cond_val, _ = self.visit(ctx.expression())
+        converted_cond_val = EasyGoTypes.cast_type(self.builder, target_type=EasyGoTypes.bool, value=cond_val, ctx=ctx)
+        self.symbol_table.enter_scope()
+        blocks = ctx.block()
+        if len(blocks) == 2:  # 存在else分支
+            with self.builder.if_else(converted_cond_val) as (then, otherwise):
+                with then:
+                    self.visit(blocks[0])
+                with otherwise:
+                    self.visit(blocks[1])
+        else:  # 只有if分支
+            with self.builder.if_then(converted_cond_val):
+                self.visit(blocks[0])
+        self.symbol_table.exit_scope()
 
     def visitBasicLit(self, ctx: GoParser.BasicLitContext):
         """
