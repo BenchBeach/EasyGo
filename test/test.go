@@ -1,9 +1,11 @@
 package packgername
 
-// func f(x,y int) int {
-//     return x+y
-// }
+func f(a int,b int, c int,d int) int {
+    return 1
+}
 
-func main(x,y int) int {
-    return x
+func main() int {
+    var c int
+    c=f(1,2,3,c)
+    return c
 }

@@ -175,7 +175,24 @@ class EasyGoGenerator(GoParserVisitor):
             operand ... and more
             return (result,result_ptr/None)
         """
-        return self.visit(ctx.operand())
+        if len(ctx.children) == 1:
+            return self.visit(ctx.operand())
+        elif match_rule(ctx.children[0], GoParser.RULE_primaryExpr) and match_rule(ctx.children[1],
+                                                                                   GoParser.RULE_arguments):
+            # should call function here
+            func, _ = self.visit(ctx.primaryExpr())
+            arg_list = self.visit(ctx.arguments())
+            if len(arg_list) > len(func.args):
+                raise SyntaxError("Too much arguments!")
+            converted_args = [EasyGoTypes.cast_type(self.builder, value=arg[0], target_type=callee_arg.type, ctx=ctx)
+                              for arg, callee_arg in zip(arg_list, func.args)]
+            return self.builder.call(func, converted_args), None
+            pass
+        else:
+            raise NotImplementedError("more primaryExpr")
+
+    def visitArguments(self, ctx: GoParser.ArgumentsContext):
+        return self.visit(ctx.expressionList())
 
     def visitOperand(self, ctx: GoParser.OperandContext):
         """
@@ -238,18 +255,18 @@ class EasyGoGenerator(GoParserVisitor):
         return rt_type, params
 
     def visitParameters(self, ctx: GoParser.ParametersContext):
-        list = []
+        param_list = []
         for i in range(len(ctx.parameterDecl())):
-            list = list + self.visit(ctx.parameterDecl(i))
-        return list
+            param_list = param_list + self.visit(ctx.parameterDecl(i))
+        return param_list
 
     def visitParameterDecl(self, ctx: GoParser.ParameterDeclContext):
         idn_list = self.visit(ctx.identifierList())
         type = self.visit(ctx.type_())
-        list = []
+        rt_list = []
         for idn in idn_list:
-            list.append((idn, type))
-        return list
+            rt_list.append((idn, type))
+        return rt_list
 
     def visitResult(self, ctx: GoParser.ResultContext):
         return self.visit(ctx.type_())
