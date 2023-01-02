@@ -33,6 +33,7 @@ class EasyGoGenerator(GoParserVisitor):
     def visitFunctionDecl(self, ctx: GoParser.FunctionDeclContext):
         """
             functionDecl: FUNC IDENTIFIER (signature block?);
+            return: void
         """
         self.is_global = False
         func_name = ctx.IDENTIFIER().getText()
@@ -69,27 +70,45 @@ class EasyGoGenerator(GoParserVisitor):
         self.is_global = True
 
     def visitAssignment(self, ctx: GoParser.AssignmentContext):
+        """
+            assignment: expressionList assign_op expressionList;
+            return:
+        """
         # 只解构第一个元素
         lhs, lhs_ptr = self.visit(ctx.expressionList(0))[0]
-        rhs, _ = self.visit(ctx.expressionList(1))[0]
-
-        target_type = lhs_ptr.type.pointee
-        op = self.visit(ctx.assign_op())
-        if op is "=":
-            self.builder.store(rhs, lhs_ptr)
-        elif op is "+=":
-            if EasyGoTypes.is_int(target_type):
-                new_value = self.builder.add(lhs, rhs)
-            elif EasyGoTypes.is_float(target_type):
-                new_value = self.builder.fadd(lhs, rhs)
+        # rhs, _ = self.visit(ctx.expressionList(1))[0]
+        #
+        # target_type = lhs_ptr.type.pointee
+        # op = self.visit(ctx.assign_op())
+        # if op is "=":
+        #     self.builder.store(rhs, lhs_ptr)
+        # elif op is "+=":
+        #     if EasyGoTypes.is_int(target_type):
+        #         new_value = self.builder.add(lhs, rhs)
+        #     elif EasyGoTypes.is_float(target_type):
+        #         new_value = self.builder.fadd(lhs, rhs)
 
     def visitExpressionList(self, ctx: GoParser.ExpressionListContext):
+        """
+            expressionList: expression (COMMA expression)*;
+            return: list[tuple(result,result_ptr/None)]
+        """
+
         list = []
         for i in range(len(ctx.expression())):
             list.append(self.visit(ctx.expression(i)))
         return list
 
     def visitExpression(self, ctx: GoParser.ExpressionContext):
+        """
+            primaryExpr
+                | unary_op = (
+                  PLUS
+                | MINUS
+                ) expression .... and more in GoParser.g4
+
+            return: (result,result_ptr/None)
+        """
         if len(ctx.children) == 1:
             # 只有primaryExpr情况
             return self.visit(ctx.primaryExpr())
@@ -98,9 +117,18 @@ class EasyGoGenerator(GoParserVisitor):
         pass
 
     def visitPrimaryExpr(self, ctx: GoParser.PrimaryExprContext):
+        """
+        primaryExpr:
+            operand ... and more
+            return (result,result_ptr/None)
+        """
         return self.visit(ctx.operand())
 
     def visitOperand(self, ctx: GoParser.OperandContext):
+        """
+        operand: literal | operandName | L_PAREN expression R_PAREN;
+        return (result,result_ptr/None)
+        """
         if ctx.operandName():
             return self.visit(ctx.operandName())
         else:
@@ -109,6 +137,7 @@ class EasyGoGenerator(GoParserVisitor):
     def visitLiteral(self, ctx: GoParser.LiteralContext):
         """
             literal: basicLit | compositeLit | functionLit;
+            return (result,result_ptr/None)
         """
         if ctx.basicLit():
             return self.visit(ctx.basicLit())
@@ -116,6 +145,14 @@ class EasyGoGenerator(GoParserVisitor):
             raise NotImplementedError("more options of literal")
 
     def visitBasicLit(self, ctx: GoParser.BasicLitContext):
+        """
+            basicLit:
+                NIL_LIT
+                | integer
+                | string_
+                | FLOAT_LIT;
+            return (result,result_ptr/None)
+        """
         if ctx.integer():
             number = ctx.integer().getText()
             return EasyGoTypes.int(int(number)), None
@@ -161,15 +198,14 @@ class EasyGoGenerator(GoParserVisitor):
     def visitDeclaration(self, ctx: GoParser.DeclarationContext):
         """
                 declaration: constDecl | typeDecl | varDecl;
-                :param ctx:
-                :return:
+                :return:void
                 """
-        return self.visit(ctx.children[0])
-        pass
+        self.visit(ctx.children[0])
 
     def visitVarDecl(self, ctx: GoParser.VarDeclContext):
         """
                 varDecl: VAR (varSpec | L_PAREN (varSpec eos)* R_PAREN);
+                return:void
         """
         self.visit(ctx.varSpec(0))
 
@@ -183,6 +219,8 @@ class EasyGoGenerator(GoParserVisitor):
         """
         idn_list = self.visit(ctx.identifierList())
         type = self.visit(ctx.type_())
+        if ctx.expressionList():
+            value, _ = self.visit(ctx.expressionList())[0]
         for var_name in idn_list:
             try:
                 # if self.is_global:  # 如果是全局变量
@@ -190,6 +228,9 @@ class EasyGoGenerator(GoParserVisitor):
                 #     self.symbol_table[var_name].linkage = "internal"
                 # else:  # 如果是局部变量
                 self.symbol_table[var_name] = self.builder.alloca(type)
+                # 如果有初始赋值就赋值
+                if ctx.expressionList():
+                    self.builder.store(value, self.symbol_table[var_name])
                 pass
             except RedefinitionError as e:
                 raise SemanticError(msg="redefinition variable {}".format(var_name), ctx=ctx)
