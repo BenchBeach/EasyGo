@@ -137,6 +137,10 @@ class EasyGoGenerator(GoParserVisitor):
             raise NotImplementedError("complex expression 3")
         pass
 
+    def visitReturnStmt(self, ctx: GoParser.ReturnStmtContext):
+        rt, _ = self.visit(ctx.expressionList())[0]
+        self.builder.ret(rt)
+
     def visitPrimaryExpr(self, ctx: GoParser.PrimaryExprContext):
         """
         primaryExpr:
