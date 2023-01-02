@@ -76,17 +76,17 @@ class EasyGoGenerator(GoParserVisitor):
         """
         # 只解构第一个元素
         lhs, lhs_ptr = self.visit(ctx.expressionList(0))[0]
-        # rhs, _ = self.visit(ctx.expressionList(1))[0]
-        #
-        # target_type = lhs_ptr.type.pointee
-        # op = self.visit(ctx.assign_op())
-        # if op is "=":
-        #     self.builder.store(rhs, lhs_ptr)
-        # elif op is "+=":
-        #     if EasyGoTypes.is_int(target_type):
-        #         new_value = self.builder.add(lhs, rhs)
-        #     elif EasyGoTypes.is_float(target_type):
-        #         new_value = self.builder.fadd(lhs, rhs)
+        rhs, _ = self.visit(ctx.expressionList(1))[0]
+
+        target_type = lhs_ptr.type.pointee
+        op = self.visit(ctx.assign_op())
+        if op is "=":
+            self.builder.store(rhs, lhs_ptr)
+        elif op is "+=":
+            if EasyGoTypes.is_int(target_type):
+                new_value = self.builder.add(lhs, rhs)
+            elif EasyGoTypes.is_float(target_type):
+                new_value = self.builder.fadd(lhs, rhs)
 
     def visitExpressionList(self, ctx: GoParser.ExpressionListContext):
         """
@@ -112,8 +112,29 @@ class EasyGoGenerator(GoParserVisitor):
         if len(ctx.children) == 1:
             # 只有primaryExpr情况
             return self.visit(ctx.primaryExpr())
+        elif len(ctx.children) == 3:
+            # get left
+            lhs, _ = self.visit(ctx.children[0])
+            op = ctx.children[1].getText()
+            # get right
+            if match_rule(ctx.children[2], GoParser.RULE_expression):
+                rhs, _ = self.visit(ctx.children[2])
+            else:
+                raise NotImplementedError("complex expression 1")
+
+            # TODO: more operator to be implemented
+            if op == '+':
+                ltype = lhs.type
+                rtype = rhs.type
+                if ltype != rtype:
+                    raise SemanticError(ctx=ctx, msg="Not support type casting in expression.")
+                else:
+                    return self.builder.add(lhs, rhs), _
+            else:
+                raise NotImplementedError("complex expression 2")
+            pass
         else:
-            NotImplementedError("complex expression")
+            raise NotImplementedError("complex expression 3")
         pass
 
     def visitPrimaryExpr(self, ctx: GoParser.PrimaryExprContext):
@@ -131,8 +152,10 @@ class EasyGoGenerator(GoParserVisitor):
         """
         if ctx.operandName():
             return self.visit(ctx.operandName())
-        else:
+        elif ctx.literal():
             return self.visit(ctx.literal())
+        else:
+            return self.visit(ctx.expression())
 
     def visitLiteral(self, ctx: GoParser.LiteralContext):
         """
