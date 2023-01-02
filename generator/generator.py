@@ -79,6 +79,8 @@ class EasyGoGenerator(GoParserVisitor):
         rhs, _ = self.visit(ctx.expressionList(1))[0]
 
         target_type = lhs_ptr.type.pointee
+        # if rhs.type != target_type:
+        #     rhs = EasyGoTypes.cast_type(self.builder, target_type, rhs, ctx)
         op = self.visit(ctx.assign_op())
         if op == "=":
             self.builder.store(rhs, lhs_ptr)
@@ -129,19 +131,38 @@ class EasyGoGenerator(GoParserVisitor):
             else:
                 raise NotImplementedError("complex expression 1")
 
+            ltype = lhs.type
+            rtype = rhs.type
+            if ltype != rtype:
+                rhs = EasyGoTypes.cast_type(self.builder, ltype, rhs, ctx)
+
             # TODO: more operator to be implemented
-            if op == '+':
-                ltype = lhs.type
-                rtype = rhs.type
-                if ltype != rtype:
-                    raise SemanticError(ctx=ctx, msg="Not support type casting in expression.")
-                else:
+            if EasyGoTypes.is_int(ltype):
+                if op == '+':
                     return self.builder.add(lhs, rhs), _
+                elif op == '-':
+                    return self.builder.sub(lhs, rhs), _
+                elif op == '*':
+                    return self.builder.mul(lhs, rhs), _
+                elif op == '/':
+                    return self.builder.sdiv(lhs, rhs), _
+                else:
+                    raise NotImplementedError("complex expression 2")
+                pass
             else:
-                raise NotImplementedError("complex expression 2")
-            pass
+                if op == '+':
+                    return self.builder.fadd(lhs, rhs), _
+                elif op == '-':
+                    return self.builder.fsub(lhs, rhs), _
+                elif op == '*':
+                    return self.builder.fmul(lhs, rhs), _
+                elif op == '/':
+                    return self.builder.fdiv(lhs, rhs), _
+                else:
+                    raise NotImplementedError("complex expression 3")
+                pass
         else:
-            raise NotImplementedError("complex expression 3")
+            raise NotImplementedError("complex expression 4")
         pass
 
     def visitReturnStmt(self, ctx: GoParser.ReturnStmtContext):
@@ -255,6 +276,8 @@ class EasyGoGenerator(GoParserVisitor):
         type = self.visit(ctx.type_())
         if ctx.expressionList():
             value, _ = self.visit(ctx.expressionList())[0]
+            if value.type != type:
+                value = EasyGoTypes.cast_type(self.builder, type, value, ctx)
         for var_name in idn_list:
             try:
                 # if self.is_global:  # 如果是全局变量
