@@ -73,12 +73,12 @@ class EasyGoTypes(object):
     @classmethod
     def is_int(cls, type):
         """判断某个类型是否为整数类型"""
-        return type in [cls.int, cls.short, cls.char]
+        return type in [cls.int, cls.int16]
 
     @classmethod
     def is_float(cls, type):
         """判断某个类型是否为浮点数类型"""
-        return type in [cls.float, cls.double]
+        return type in [cls.float64]
 
     @classmethod
     def cast_type(cls, builder, target_type, value, ctx):

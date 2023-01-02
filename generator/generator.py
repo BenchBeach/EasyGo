@@ -80,13 +80,20 @@ class EasyGoGenerator(GoParserVisitor):
 
         target_type = lhs_ptr.type.pointee
         op = self.visit(ctx.assign_op())
-        if op is "=":
+        if op == "=":
             self.builder.store(rhs, lhs_ptr)
-        elif op is "+=":
+        elif op == "+=":
             if EasyGoTypes.is_int(target_type):
                 new_value = self.builder.add(lhs, rhs)
             elif EasyGoTypes.is_float(target_type):
                 new_value = self.builder.fadd(lhs, rhs)
+            self.builder.store(new_value, lhs_ptr)
+        elif op == "-=":
+            if EasyGoTypes.is_int(target_type):
+                new_value = self.builder.sub(lhs, rhs)
+            elif EasyGoTypes.is_float(target_type):
+                new_value = self.builder.fsub(lhs, rhs)
+            self.builder.store(new_value, lhs_ptr)
 
     def visitExpressionList(self, ctx: GoParser.ExpressionListContext):
         """
