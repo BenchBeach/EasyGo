@@ -220,7 +220,11 @@ class EasyGoGenerator(GoParserVisitor):
     def visitOperandName(self, ctx: GoParser.OperandNameContext):
         name = ctx.IDENTIFIER().getText()
         ptr = self.symbol_table[name]
-        return self.builder.load(ptr), ptr
+        if type(ptr) in [ir.Argument, ir.Function]:
+            var_val = ptr
+            return var_val, None
+        else:
+            return self.builder.load(ptr), ptr
 
     def visitAssign_op(self, ctx: GoParser.Assign_opContext):
         return ctx.getText()
