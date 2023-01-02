@@ -225,6 +225,8 @@ class EasyGoGenerator(GoParserVisitor):
         converted_cond_val = EasyGoTypes.cast_type(self.builder, target_type=EasyGoTypes.bool, value=cond_val, ctx=ctx)
         self.symbol_table.enter_scope()
         blocks = ctx.block()
+        if ctx.ifStmt():
+            blocks.append(ctx.ifStmt())
         if len(blocks) == 2:  # 存在else分支
             with self.builder.if_else(converted_cond_val) as (then, otherwise):
                 with then:

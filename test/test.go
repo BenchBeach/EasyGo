@@ -1,16 +1,17 @@
 package packgername
 
-// func f(a int,b int) int {
-//     var c int=a+b
-//     return c
-// }
+func fib(n int) int{
+    if n <= 0 {
+        return 0
+    }else if n==1 {
+        return 1
+    }
+    return fib(n-1) + fib(n-2)
+}
 
 func main() int {
-    var c int=0
-    if c==1 {
-        c=1
-    }else{
-        c=2
-    }
-    return c
+    var n int=6
+    var x int
+    x = fib(n)
+    return x
 }
