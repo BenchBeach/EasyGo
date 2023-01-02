@@ -17,6 +17,7 @@ class EasyGoTypes(object):
         "bool": bool,
         "float32": float64,
         "float64": float64,
+        "void": void
     }
     # ASCII 转义表
     ascii_mapping = {

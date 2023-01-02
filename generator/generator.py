@@ -30,6 +30,134 @@ class EasyGoGenerator(GoParserVisitor):
     ARRAY_TYPE = 1
     FUNCTION_TYPE = 2
 
+    def visitFunctionDecl(self, ctx: GoParser.FunctionDeclContext):
+        """
+            functionDecl: FUNC IDENTIFIER (signature block?);
+        """
+        self.is_global = False
+        func_name = ctx.IDENTIFIER().getText()
+        rt_type, params = self.visit(ctx.signature())
+        arg_names = tuple(map(lambda x: x[0], params))
+        param_types = tuple(map(lambda x: x[1], params))
+        new_func_type = ir.FunctionType(rt_type, param_types)
+
+        # 在当前作用域生成llvm函数
+        if func_name in self.symbol_table:
+            llvm_function = self.symbol_table[func_name]
+            if llvm_function.function_type != new_func_type:
+                raise SemanticError("Function {}'s definition different from its declaration".format(func_name), ctx)
+        else:
+            llvm_function = ir.Function(self.module, new_func_type, name=func_name)
+            self.symbol_table[func_name] = llvm_function
+        self.builder = ir.IRBuilder(llvm_function.append_basic_block(name="entry"))
+        # 进入作用域,将参数添加到当前作用域
+        self.symbol_table.enter_scope()
+        try:
+            for arg_name, llvm_arg in zip(arg_names, llvm_function.args):
+                self.symbol_table[arg_name] = llvm_arg
+        except RedefinitionError as e:
+            raise SemanticError(msg="Redefinition local variable {}".format(arg_name), ctx=ctx)
+
+        self.continue_block = None
+        self.break_block = None
+
+        self.visit(ctx.block())
+
+        if new_func_type.return_type == EasyGoTypes.void:
+            self.builder.ret_void()
+        self.symbol_table.exit_scope()
+        self.is_global = True
+
+    def visitAssignment(self, ctx: GoParser.AssignmentContext):
+        # 只解构第一个元素
+        lhs, lhs_ptr = self.visit(ctx.expressionList(0))[0]
+        rhs, _ = self.visit(ctx.expressionList(1))[0]
+
+        target_type = lhs_ptr.type.pointee
+        op = self.visit(ctx.assign_op())
+        if op is "=":
+            self.builder.store(rhs, lhs_ptr)
+        elif op is "+=":
+            if EasyGoTypes.is_int(target_type):
+                new_value = self.builder.add(lhs, rhs)
+            elif EasyGoTypes.is_float(target_type):
+                new_value = self.builder.fadd(lhs, rhs)
+
+    def visitExpressionList(self, ctx: GoParser.ExpressionListContext):
+        list = []
+        for i in range(len(ctx.expression())):
+            list.append(self.visit(ctx.expression(i)))
+        return list
+
+    def visitExpression(self, ctx: GoParser.ExpressionContext):
+        if len(ctx.children) == 1:
+            # 只有primaryExpr情况
+            return self.visit(ctx.primaryExpr())
+        else:
+            NotImplementedError("complex expression")
+        pass
+
+    def visitPrimaryExpr(self, ctx: GoParser.PrimaryExprContext):
+        return self.visit(ctx.operand())
+
+    def visitOperand(self, ctx: GoParser.OperandContext):
+        if ctx.operandName():
+            return self.visit(ctx.operandName())
+        else:
+            return self.visit(ctx.literal())
+
+    def visitLiteral(self, ctx: GoParser.LiteralContext):
+        """
+            literal: basicLit | compositeLit | functionLit;
+        """
+        if ctx.basicLit():
+            return self.visit(ctx.basicLit())
+        else:
+            raise NotImplementedError("more options of literal")
+
+    def visitBasicLit(self, ctx: GoParser.BasicLitContext):
+        if ctx.integer():
+            number = ctx.integer().getText()
+            return EasyGoTypes.int(int(number)), None
+        elif ctx.FLOAT_LIT():
+            number = ctx.FLOAT_LIT().getText()
+            return EasyGoTypes.float64(float(number)), None
+        else:
+            raise NotImplementedError("more options of BasicLit")
+
+    def visitOperandName(self, ctx: GoParser.OperandNameContext):
+        name = ctx.IDENTIFIER().getText()
+        ptr = self.symbol_table[name]
+        return self.builder.load(ptr), ptr
+
+    def visitAssign_op(self, ctx: GoParser.Assign_opContext):
+        return ctx.getText()
+
+    def visitSignature(self, ctx: GoParser.SignatureContext):
+        if ctx.result() is not None:
+            rt_type = self.visit(ctx.result())
+        else:
+            rt_type = EasyGoTypes.void
+        params = self.visit(ctx.parameters())
+        return rt_type, params
+
+    def visitParameters(self, ctx: GoParser.ParametersContext):
+        list = []
+        for i in range(len(ctx.parameterDecl())):
+            list = list + self.visit(ctx.parameterDecl(i))
+        return list
+
+    def visitParameterDecl(self, ctx: GoParser.ParameterDeclContext):
+        idn_list = self.visit(ctx.identifierList())
+        type = self.visit(ctx.type_())
+        list = []
+        for idn in idn_list:
+            list.append((idn, type))
+        return list
+
+    def visitResult(self, ctx: GoParser.ResultContext):
+        return self.visit(ctx.type_())
+
     def visitDeclaration(self, ctx: GoParser.DeclarationContext):
         """
                 declaration: constDecl | typeDecl | varDecl;
@@ -57,14 +185,14 @@ class EasyGoGenerator(GoParserVisitor):
         type = self.visit(ctx.type_())
         for var_name in idn_list:
             try:
-                if self.is_global:  # 如果是全局变量
-                    self.symbol_table[var_name] = ir.GlobalVariable(self.module, type, name=var_name)
-                    self.symbol_table[var_name].linkage = "internal"
-                else:  # 如果是局部变量
-                    self.symbol_table[var_name] = self.builder.alloca(type)
+                # if self.is_global:  # 如果是全局变量
+                #     self.symbol_table[var_name] = ir.GlobalVariable(self.module, type, name=var_name)
+                #     self.symbol_table[var_name].linkage = "internal"
+                # else:  # 如果是局部变量
+                self.symbol_table[var_name] = self.builder.alloca(type)
+                pass
             except RedefinitionError as e:
                 raise SemanticError(msg="redefinition variable {}".format(var_name), ctx=ctx)
-
 
     def visitIdentifierList(self, ctx: GoParser.IdentifierListContext):
         idn_list = list(map(lambda x: x.getText(), ctx.IDENTIFIER()))
