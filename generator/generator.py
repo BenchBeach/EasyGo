@@ -55,7 +55,8 @@ class EasyGoGenerator(GoParserVisitor):
         self.symbol_table.enter_scope()
         try:
             for arg_name, llvm_arg in zip(arg_names, llvm_function.args):
-                self.symbol_table[arg_name] = llvm_arg
+                self.symbol_table[arg_name] = self.builder.alloca(llvm_arg.type)
+                self.builder.store(llvm_arg, self.symbol_table[arg_name])
         except RedefinitionError as e:
             raise SemanticError(msg="Redefinition local variable {}".format(arg_name), ctx=ctx)
 
@@ -187,7 +188,7 @@ class EasyGoGenerator(GoParserVisitor):
             func, _ = self.visit(ctx.primaryExpr())
             arg_list = self.visit(ctx.arguments())
             if len(arg_list) > len(func.args):
-                raise SyntaxError("Too much arguments!")
+                raise SyntaxError("Too much arguments! Don't support default value yet!")
             converted_args = [EasyGoTypes.cast_type(self.builder, value=arg[0], target_type=callee_arg.type, ctx=ctx)
                               for arg, callee_arg in zip(arg_list, func.args)]
             return self.builder.call(func, converted_args), None
