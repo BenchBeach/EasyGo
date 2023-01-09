@@ -242,9 +242,9 @@ class EasyGoGenerator(GoParserVisitor):
     def visitForStmt(self, ctx: GoParser.ForStmtContext):
         self.symbol_table.enter_scope()
         name_prefix = self.builder.block.name
-        cond_block = self.builder.append_basic_block(name_prefix + "loop_cond")
-        body_block = self.builder.append_basic_block(name_prefix + "loop_body")
-        end_block = self.builder.append_basic_block(name_prefix + "loop_end")
+        cond_block = self.builder.append_basic_block(name_prefix + ".loop_cond")
+        body_block = self.builder.append_basic_block(name_prefix + ".loop_body")
+        end_block = self.builder.append_basic_block(name_prefix + ".loop_end")
         # condition
         cond_expression = ctx.expression()
         self.builder.branch(cond_block)
