@@ -1,4 +1,4 @@
-package packgername
+package packagename
 
 func fib(n int) int{
     if n <= 0 {

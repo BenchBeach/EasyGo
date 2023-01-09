@@ -239,6 +239,30 @@ class EasyGoGenerator(GoParserVisitor):
                 self.visit(blocks[0])
         self.symbol_table.exit_scope()
 
+    def visitForStmt(self, ctx: GoParser.ForStmtContext):
+        self.symbol_table.enter_scope()
+        name_prefix = self.builder.block.name
+        cond_block = self.builder.append_basic_block(name_prefix + "loop_cond")
+        body_block = self.builder.append_basic_block(name_prefix + "loop_body")
+        end_block = self.builder.append_basic_block(name_prefix + "loop_end")
+        # condition
+        cond_expression = ctx.expression()
+        self.builder.branch(cond_block)
+        self.builder.position_at_start(cond_block)
+        if cond_expression:
+            cond_val, _ = self.visit(cond_expression)
+            converted_cond_val = EasyGoTypes.cast_type(self.builder, target_type=EasyGoTypes.bool, value=cond_val, ctx=ctx)
+            self.builder.cbranch(converted_cond_val, body_block, end_block)
+        else:
+            self.builder.branch(body_block)
+        # body
+        self.builder.position_at_start(body_block)
+        self.visit(ctx.block())
+        self.builder.branch(cond_block)
+        # end
+        self.builder.position_at_start(end_block)
+        self.symbol_table.exit_scope()
+
     def visitBasicLit(self, ctx: GoParser.BasicLitContext):
         """
             basicLit:
